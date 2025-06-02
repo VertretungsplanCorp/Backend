@@ -1,0 +1,12 @@
+[package]
+name = "vpbackend"
+version = "0.0.1"
+authors = ["sert"]
+description = "Vertretungsplan Software"
+repository = "https://github.com/VertretungsplanCorp/Backend"
+readme = "https://github.com/VertretungsplanCorp/Backend/blob/main/README.md"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.8" }
+tokio = { version = "1.45", features = ["rt", "net", "rt-multi-thread"] }
