@@ -1,6 +1,9 @@
 Das ist das Backend, geschrieben in Rust.
 
-Use:
+Benutzen:
+
+Info: stelle sicher, dass du Docker(https://docs.docker.com/engine/install/)
+installiert hast.
 
 ```bash
 mkdir vpbackend && cd vpbackend
