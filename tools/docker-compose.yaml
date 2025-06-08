@@ -1,0 +1,11 @@
+services:
+  vp_server_service:
+    build:
+      dockerfile: ./Dockerfile
+    container_name: vp_server
+    ports:
+      - "${SV_PORT}:${INTERN_SV_PORT}"
+
+networks:
+  vp_net:
+    driver: bridge
