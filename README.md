@@ -2,7 +2,7 @@ Das ist das Backend, geschrieben in Rust.
 
 Benutzen:
 
-Info: stelle sicher, dass du Docker(https://docs.docker.com/engine/install/)
+Info: stelle sicher, dass du Docker[https://docs.docker.com/engine/install/]
 installiert hast.
 
 ```bash
