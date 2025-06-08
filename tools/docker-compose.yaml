@@ -3,6 +3,9 @@ services:
     build:
       dockerfile: ./Dockerfile
     container_name: vp_server
+    working_dir: /app
+    volumes:
+      - .:/app
     ports:
       - "${SV_PORT}:${INTERN_SV_PORT}"
 
