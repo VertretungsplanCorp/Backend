@@ -4,10 +4,13 @@ version = "0.0.1"
 authors = ["sert"]
 description = "Vertretungsplan Software"
 repository = "https://github.com/VertretungsplanCorp/Backend"
-readme = "https://github.com/VertretungsplanCorp/Backend/blob/main/README.md"
+readme = "README.md"
 edition = "2024"
 
 [dependencies]
 axum = { version = "0.8" }
+tower = { version = "0.5" }
+tower-http = { version = "0.6", features = ["cors"] }
 tokio = { version = "1.45", features = ["rt", "net", "rt-multi-thread"] }
 dotenvy = { version = "0.15" }
+

@@ -5,12 +5,18 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
 };
 use tokio::{main, net::TcpSocket};
+use tower_http::cors::*;
 
 #[main]
 async fn main() {
     dotenv().ok();
 
-    let app = Router::new().route("/ping", get(ping));
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
+    let app = Router::new().route("/ping", get(ping)).layer(cors);
 
     let host = env::var("INTERN_SV_HOST")
         .expect("An intern server host must be specified")
