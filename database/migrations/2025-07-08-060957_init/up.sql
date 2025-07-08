@@ -1,0 +1,18 @@
+CREATE TABLE vertretungen (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    klasse VARCHAR(10) NOT NULL,
+    stunde SMALLINT CHECK (stunde > 0 AND stunde < 10) NOT NULL,
+    fach VARCHAR(20) NOT NULL,
+    raum VARCHAR(3),
+    raum_neu VARCHAR(3),
+    text VARCHAR(100),
+    datum TIMESTAMP WITH TIME ZONE DEFAULT NOT NULL,
+    erstelldatum TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+);
+
+CREATE TABLE infos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    text TEXT NOT NULL,
+    datum TIMESTAMP WITH TIME ZONE DEFAULT NOT NULL,
+    erstelldatum TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+);

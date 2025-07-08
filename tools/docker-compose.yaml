@@ -1,4 +1,22 @@
 services:
+  vp_database_service:
+    image: postgis/postgis:latest
+    container_name: vp_database
+    ports:
+      - "${DB_PORT}:${INTERN_DB_PORT}"
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+  vp_pgadmin_service:
+    image: dpage/pgadmin4
+    container_name: vp_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PG_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PG_PASSWORD}
+    ports:
+      - "${PG_PORT}:${INTERN_PG_PORT}"
+    restart: unless-stopped
   vp_server_service:
     build:
       dockerfile: ./Dockerfile
@@ -8,6 +26,8 @@ services:
       - .:/app
     ports:
       - "${SV_PORT}:${INTERN_SV_PORT}"
+    depends-on:
+      - vp_database_service
 
 networks:
   vp_net:

@@ -1,4 +1,9 @@
 use axum::{routing::get, Router};
+use deadpool_diesel::{
+    postgres::{Manager, Pool},
+    Runtime::Tokio1,
+};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
 use std::{
     env,
@@ -6,6 +11,8 @@ use std::{
 };
 use tokio::{main, net::TcpSocket};
 use tower_http::cors::*;
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("database/migrations");
 
 #[main]
 async fn main() {
@@ -16,7 +23,26 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new().route("/ping", get(ping)).layer(cors);
+    // ############################## DATABASE ############################## //
+
+    let database_url = env::var("DATABASE_URL").expect("Please provide a correct DATABASE_URL.");
+
+    let manager = Manager::new(database_url, Tokio1);
+    let pool = Pool::builder(manager).build().unwrap();
+
+    {
+        let manager = pool.get().await.unwrap();
+        manager
+            .interact(|c| c.run_pending_migrations(MIGRATIONS).map(|_| ()))
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    let app = Router::new()
+        .route("/ping", get(ping))
+        .layer(cors)
+        .with_state(pool);
 
     let host = env::var("INTERN_SV_HOST")
         .expect("An intern server host must be specified")
