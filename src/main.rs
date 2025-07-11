@@ -1,16 +1,20 @@
-use axum::{routing::get, Router};
+use axum::{extract::State, response::Json, routing::get, Router};
 use deadpool_diesel::{
     postgres::{Manager, Pool},
     Runtime::Tokio1,
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
+use serde_json::{json, Value};
 use std::{
     env,
     net::{IpAddr, Ipv4Addr, SocketAddr},
 };
 use tokio::{main, net::TcpSocket};
 use tower_http::cors::*;
+
+mod database;
+use database::schema::*;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("database/migrations");
 
@@ -79,4 +83,10 @@ async fn main() {
 
 async fn ping() -> &'static str {
     "Hallo aus dem Backend!"
+}
+
+async fn getKlasse(klasse: String, State(pool): State<Pool>) -> Json<Value> {
+    // let m: Manager = pool.get().await.unwrap();
+    // m.interact(move |c| insert_into(ratings))
+    todo!()
 }
