@@ -55,14 +55,9 @@ async fn scraper() -> PyResult<()> {
             target_time - now
         };
 
-        println!(
-            "Next Python execution in {} seconds",
-            duration_until.num_seconds()
-        );
         sleep(Duration::from_secs(duration_until.num_seconds() as u64)).await;
 
         Python::with_gil(|py| {
-            println!("Executing Python script at 8:00");
             py.run(
                 &CString::new(include_str!("scraper/scraping.py")).unwrap(),
                 None,
