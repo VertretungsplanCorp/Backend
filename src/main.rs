@@ -1,25 +1,80 @@
-use axum::{extract::State, response::Json, routing::get, Router};
+// %% INCLUDES %%
+use axum::{routing::get, Router};
+use chrono::Local;
 use deadpool_diesel::{
     postgres::{Manager, Pool},
     Runtime::Tokio1,
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
-use serde_json::{json, Value};
+use pyo3::prelude::*;
+use std::ffi::CString;
 use std::{
     env,
     net::{IpAddr, Ipv4Addr, SocketAddr},
 };
-use tokio::{main, net::TcpSocket};
+use tokio::net::TcpSocket;
+use tokio::task;
+use tokio::time::{sleep, Duration};
 use tower_http::cors::*;
 
+// %% MODULE %%
 mod database;
 use database::schema::*;
 
+mod functions;
+use functions::*;
+
+// %% FUNCTIONS %%
+
+// % main %
+#[tokio::main]
+async fn main() {
+    let main_process = task::spawn(async { api().await });
+    let python_scheduler = task::spawn(async { scraper().await });
+    let _ = tokio::try_join!(main_process, python_scheduler).unwrap();
+}
+
+// % embedded migrations %
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("database/migrations");
 
-#[main]
-async fn main() {
+// % SCRAPER %
+async fn scraper() -> PyResult<()> {
+    loop {
+        let now = Local::now();
+        let target_time = now
+            .date_naive()
+            .and_hms_opt(7, 3, 0)
+            .unwrap()
+            .and_local_timezone(now.timezone())
+            .unwrap();
+
+        let duration_until = if target_time < now {
+            (target_time + chrono::Duration::days(1)) - now
+        } else {
+            target_time - now
+        };
+
+        println!(
+            "Next Python execution in {} seconds",
+            duration_until.num_seconds()
+        );
+        sleep(Duration::from_secs(duration_until.num_seconds() as u64)).await;
+
+        Python::with_gil(|py| {
+            println!("Executing Python script at 8:00");
+            py.run(
+                &CString::new(include_str!("scraper/scraping.py")).unwrap(),
+                None,
+                None,
+            )
+            .unwrap();
+        });
+    }
+}
+
+// % API %
+async fn api() {
     dotenv().ok();
 
     let cors = CorsLayer::new()
@@ -45,10 +100,11 @@ async fn main() {
 
     let app = Router::new()
         .route("/ping", get(ping))
+        .route("/ping_json", get(ping_json))
         .layer(cors)
         .with_state(pool);
 
-    let host = env::var("INTERN_SV_HOST")
+    let host = env::var("SV_HOST")
         .expect("An intern server host must be specified")
         .parse::<Ipv4Addr>()
         .expect("Please provide an intern ipv4 adress as host");
@@ -79,14 +135,4 @@ async fn main() {
     )
     .await
     .expect("Could not serve");
-}
-
-async fn ping() -> &'static str {
-    "Hallo aus dem Backend!"
-}
-
-async fn getKlasse(klasse: String, State(pool): State<Pool>) -> Json<Value> {
-    // let m: Manager = pool.get().await.unwrap();
-    // m.interact(move |c| insert_into(ratings))
-    todo!()
 }

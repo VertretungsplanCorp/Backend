@@ -8,15 +8,22 @@ services:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
+    networks:
+      vp_net:
+        ipv4_address: ${DB_HOST}
   vp_pgadmin_service:
     image: dpage/pgadmin4
     container_name: vp_pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PG_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PG_PASSWORD}
+      PGADMIN_LISTEN_PORT: ${PG_LISTEN_PORT}
     ports:
       - "${PG_PORT}:${INTERN_PG_PORT}"
     restart: unless-stopped
+    networks:
+      vp_net:
+        ipv4_address: ${PG_HOST}
   vp_server_service:
     build:
       dockerfile: ./Dockerfile
@@ -26,9 +33,17 @@ services:
       - .:/app
     ports:
       - "${SV_PORT}:${INTERN_SV_PORT}"
-    depends-on:
+    depends_on:
       - vp_database_service
+    restart: on-failure
+    networks:
+      vp_net:
+        ipv4_address: ${SV_HOST}
 
 networks:
   vp_net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: "${SUBNET}"
+          gateway: "${GATEWAY}"

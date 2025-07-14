@@ -17,3 +17,5 @@ diesel = { version = "2.2", features = ["postgres"] }
 diesel_migrations = { version = "2.2" }
 deadpool-diesel = { version = "0.6", features = ["postgres"] }
 serde_json = { version = "1.0" }
+pyo3 = { version = "0.25", features = ["auto-initialize"] }
+chrono = { version = "0.4" }
