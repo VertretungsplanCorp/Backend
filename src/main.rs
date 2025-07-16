@@ -96,6 +96,7 @@ async fn api() {
     let app = Router::new()
         .route("/ping", get(ping))
         .route("/ping_json", get(ping_json))
+        .route("/get_klasse", get(get_klasse))
         .layer(cors)
         .with_state(pool);
 

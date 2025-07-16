@@ -1,5 +1,5 @@
 [package]
-name = "vpbackend"
+name = "vp-backend"
 version = "0.0.2"
 authors = ["sert"]
 description = "Vertretungsplan Software"
@@ -18,4 +18,7 @@ diesel_migrations = { version = "2.2" }
 deadpool-diesel = { version = "0.6", features = ["postgres"] }
 serde_json = { version = "1.0" }
 pyo3 = { version = "0.25", features = ["auto-initialize"] }
-chrono = { version = "0.4" }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0" }
+uuid = { version = "1.17", features = ["serde"] }
+vp-api = { version = "0.0.1", git = "https://github.com/VertretungsplanCorp/Api.git", features = ["db"]}

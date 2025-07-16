@@ -3,10 +3,10 @@ FROM ubuntu:latest
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y wget tar libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libpq-dev && \
+    apt-get install -y wget tar libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libpq-dev software-properties-common && \
     rm -rf /var/lib/apt/lists/* && \
     add-apt-repository ppa:deadsnakes/ppa && \
-    install python3.13-full
+    apt install -y python3.13-full python3.13-dev
 
 
 RUN curl -fsSL https://apt.fury.io/nushell/gpg.key | gpg --dearmor -o /etc/apt/trusted.gpg.d/fury-nushell.gpg
