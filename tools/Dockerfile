@@ -13,6 +13,8 @@ RUN curl -fsSL https://apt.fury.io/nushell/gpg.key | gpg --dearmor -o /etc/apt/t
 RUN echo "deb https://apt.fury.io/nushell/ /" | tee /etc/apt/sources.list.d/fury.list
 RUN apt update && apt install nushell
 
-COPY . .
+COPY .env .
+COPY server.nu .
+COPY vpbackend .
 
 CMD ["nu", "server.nu"]
