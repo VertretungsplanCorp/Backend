@@ -15,6 +15,6 @@ RUN apt update && apt install nushell
 
 COPY .env .
 COPY server.nu .
-COPY vpbackend .
+COPY vp-backend .
 
 CMD ["nu", "server.nu"]
