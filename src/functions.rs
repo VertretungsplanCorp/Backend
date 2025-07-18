@@ -54,7 +54,7 @@ pub async fn get_klasse(
     let r = vp_api::KlassenVertretung {
         klasse: "12e".into(),
         dati: vec![vp_api::Datum {
-            datum: chrono::Local::now().to_rfc2822(),
+            datum: Some(chrono::Utc::now()),
             vertretungen: vec![vp_api::Vertretung {
                 stunde: 1,
                 fach: Some("E".into()),
