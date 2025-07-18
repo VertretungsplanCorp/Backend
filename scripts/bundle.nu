@@ -1,4 +1,4 @@
-let exec_name = "vpbackend"
+let exec_name = "vp-backend"
 let out_dir = "out" | path expand
 let tools_dir = "tools" | path expand
 let exec_dir = ["target", "release"] | path join | path expand

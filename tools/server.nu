@@ -1,2 +1,2 @@
-print "executing..."
-./vpbackend
+print "executing server..."
+./vp-backend
