@@ -13,7 +13,7 @@ tower = { version = "0.5" }
 tower-http = { version = "0.6", features = ["cors"] }
 tokio = { version = "1.45", features = ["rt", "net", "rt-multi-thread"] }
 dotenvy = { version = "0.15" }
-diesel = { version = "2.2", features = ["postgres"] }
+diesel = { version = "2.2", features = ["postgres", "chrono", "serde_json"] }
 diesel_migrations = { version = "2.2" }
 deadpool-diesel = { version = "0.6", features = ["postgres"] }
 serde_json = { version = "1.0" }

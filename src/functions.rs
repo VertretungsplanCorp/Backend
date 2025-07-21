@@ -1,14 +1,17 @@
 // %% INCLUDES %%
-use crate::database::models::*;
+use crate::database::*;
 use axum::{
     extract::{Query, State},
-    response::Json,
+    response::{IntoResponse, Json, Response},
 };
-use deadpool_diesel::postgres::Pool;
+use chrono::{DateTime, Utc};
+use deadpool_diesel::postgres::{InteractError, Manager, Pool};
+use diesel::{prelude::*, result::DatabaseErrorInformation};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::{collections::HashMap, error::Error};
 use std::{
     env,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -19,6 +22,23 @@ use tokio::{main, net::TcpSocket};
 use tower_http::cors::*;
 use uuid::Uuid;
 
+// %% HELPER FUNCTIONS %%
+
+pub async fn query_db<F, R>(pool: Pool, f: F) -> Result<R, impl IntoResponse>
+where
+    F: FnOnce(&mut PgConnection) -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let m = pool
+        .get()
+        .await
+        .map_err(|_| "cannot access database".to_string())?;
+    m.interact(f)
+        .await
+        .map_err(|_| "cannot interact with database".to_string())
+        .map_err(|e| format!("Couldn't query. Error: {}", e.message()))
+}
+
 // %% FUNCTIONS %%
 pub async fn ping() -> &'static str {
     "Hallo aus dem Backend!"
@@ -28,46 +48,160 @@ pub async fn ping_json() -> Json<Value> {
     Json(json!({ "ping": 42 }))
 }
 
+impl From<models::Vertretung> for vp_api::Vertretung {
+    fn from(v: models::Vertretung) -> Self {
+        Self {
+            stunde: v.stunde as u8,
+            fach: v.fach,
+            fach_neu: v.fach_neu,
+            lehrer: v.lehrer,
+            lehrer_neu: v.lehrer_neu,
+            raum: v.raum,
+            raum_neu: v.raum_neu,
+            text: v.text,
+        }
+    }
+}
+
+struct Klasse {
+    klasse: char,
+    stufe: u8,
+    vertretungen: Vec<models::Vertretung>,
+}
+impl From<Klasse> for vp_api::Klasse {
+    fn from(
+        Klasse {
+            klasse,
+            stufe,
+            vertretungen,
+        }: Klasse,
+    ) -> Self {
+        let mut m: HashMap<DateTime<Utc>, Vec<vp_api::Vertretung>> = HashMap::new();
+        for e in vertretungen {
+            if let Some(d) = m.get_mut(&e.datum) {
+                d.push(e.into());
+            } else {
+                m.insert(e.datum, vec![e.into()]);
+            }
+        }
+
+        let mut dati: Vec<vp_api::Datum> = Vec::new();
+        for (datum, vertretungen) in m {
+            dati.push(vp_api::Datum {
+                datum: Some(datum),
+                vertretungen,
+            });
+        }
+
+        Self {
+            klasse,
+            stufe,
+            dati,
+            erstelldatum: Some(Utc::now()),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct KlasseQuery {
-    klasse: String,
+    klasse: char,
+    stufe: u8,
 }
 pub async fn get_klasse(
-    Query(klasse_query): Query<KlasseQuery>,
+    Query(KlasseQuery { klasse, stufe }): Query<KlasseQuery>,
     State(pool): State<Pool>,
-) -> Json<Value> {
-    // let m: Manager = pool.get().await.unwrap();
-    // m.interact(move |c| insert_into(ratings))
-    // let v = Vertretung {
-    //     id: Uuid::default(),
-    //     klasse: "8c".into(),
-    //     fach: "E".into(),
-    //     fach_neu: Some("D".into()),
-    //     raum: Some("H101".into()),
-    //     raum_neu: Some("H309".into()),
-    //     text: Some("Arbeitsauftrag auf Mebis".into()),
-    //     datum: chrono::Local::now().into(),
-    //     stunde: 1,
-    //     erstelldatum: chrono::Local::now().into(),
-    // };
+) -> Result<Json<Value>, impl IntoResponse> {
+    use schema::vertretungen::dsl as s;
 
-    let r = vp_api::KlassenVertretung {
-        klasse: "12e".into(),
-        dati: vec![vp_api::Datum {
-            datum: Some(chrono::Utc::now()),
-            vertretungen: vec![vp_api::Vertretung {
-                stunde: 1,
-                fach: Some("E".into()),
-                raum: Some("H301".into()),
-                text: Some("AB auf Mebis".into()),
-                lehrer: Some("smi".into()),
-                raum_neu: Some("H302".into()),
-                lehrer_neu: Some("cla".into()),
-                fach_neu: Some("D".into()),
-            }],
-        }],
-        erstellt_am: chrono::Local::now().to_rfc2822(),
-    };
+    let vertretungen: Vec<models::Vertretung> = query_db(pool, move |c| {
+        s::vertretungen
+            .filter(s::stufe.eq(stufe as i16))
+            .filter(s::klasse.eq(klasse.to_string()))
+            .load(c)
+    })
+    .await??;
 
-    Json(serde_json::to_value(r).unwrap())
+    let r: vp_api::Klasse = Klasse {
+        klasse,
+        stufe,
+        vertretungen,
+    }
+    .into();
+
+    Ok(Json(serde_json::to_value(r).unwrap()))
+}
+
+struct Stufe {
+    stufe: u8,
+    vertretungen: Vec<models::Vertretung>,
+}
+impl From<Stufe> for vp_api::Stufe {
+    fn from(
+        Stufe {
+            stufe,
+            vertretungen,
+        }: Stufe,
+    ) -> Self {
+        let mut m: HashMap<char, Vec<models::Vertretung>> = HashMap::new();
+        for e in vertretungen {
+            let k = e.klasse.clone().pop().unwrap();
+            if let Some(v) = m.get_mut(&k) {
+                v.push(e);
+            } else {
+                m.insert(k, vec![e.into()]);
+            }
+        }
+
+        let mut klassen: Vec<vp_api::Klasse> = Vec::new();
+        for (klasse, vertretungen) in m {
+            klassen.push(
+                Klasse {
+                    klasse,
+                    stufe,
+                    vertretungen,
+                }
+                .into(),
+            );
+        }
+
+        Self { stufe, klassen }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StufeQuery {
+    stufe: u8,
+}
+async fn get_stufe(
+    Query(StufeQuery { stufe }): Query<StufeQuery>,
+    State(pool): State<Pool>,
+) -> Result<Json<Value>, impl IntoResponse> {
+    use schema::vertretungen::dsl as s;
+
+    let vertretungen: Vec<models::Vertretung> = query_db(pool, move |c| {
+        s::vertretungen.filter(s::stufe.eq(stufe as i16)).load(c)
+    })
+    .await??;
+
+    let r: vp_api::Stufe = Stufe {
+        stufe,
+        vertretungen,
+    }
+    .into();
+
+    Ok(Json(serde_json::to_value(r).unwrap()))
+}
+
+pub async fn get_info(State(pool): State<Pool>) -> Result<Json<Value>, impl IntoResponse> {
+    use schema::infos::dsl::*;
+    let r: models::Infos = query_db(pool, move |c| infos.first(c)).await??;
+
+    Ok(Json(
+        serde_json::to_value(vp_api::Info {
+            datum: Some(r.datum),
+            text: r.text,
+            erstelldatum: Some(r.erstelldatum),
+        })
+        .unwrap(),
+    ))
 }
