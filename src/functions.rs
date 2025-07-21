@@ -1,26 +1,18 @@
 // %% INCLUDES %%
+// % intern %
 use crate::database::*;
+
+// % extern %
 use axum::{
     extract::{Query, State},
-    response::{IntoResponse, Json, Response},
+    response::{IntoResponse, Json},
 };
 use chrono::{DateTime, Utc};
-use deadpool_diesel::postgres::{InteractError, Manager, Pool};
+use deadpool_diesel::postgres::Pool;
 use diesel::{prelude::*, result::DatabaseErrorInformation};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use dotenvy::dotenv;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{collections::HashMap, error::Error};
-use std::{
-    env,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-};
-use tokio::task;
-use tokio::time::{sleep, Duration};
-use tokio::{main, net::TcpSocket};
-use tower_http::cors::*;
-use uuid::Uuid;
+use std::collections::HashMap;
 
 // %% HELPER FUNCTIONS %%
 
@@ -49,16 +41,28 @@ pub async fn ping_json() -> Json<Value> {
 }
 
 impl From<models::Vertretung> for vp_api::Vertretung {
-    fn from(v: models::Vertretung) -> Self {
+    fn from(
+        models::Vertretung {
+            stunde,
+            fach,
+            fach_neu,
+            lehrer,
+            lehrer_neu,
+            raum_neu,
+            raum,
+            text,
+            ..
+        }: models::Vertretung,
+    ) -> Self {
         Self {
-            stunde: v.stunde as u8,
-            fach: v.fach,
-            fach_neu: v.fach_neu,
-            lehrer: v.lehrer,
-            lehrer_neu: v.lehrer_neu,
-            raum: v.raum,
-            raum_neu: v.raum_neu,
-            text: v.text,
+            stunde: stunde as u8,
+            fach,
+            fach_neu,
+            lehrer,
+            lehrer_neu,
+            raum,
+            raum_neu,
+            text,
         }
     }
 }
