@@ -35,29 +35,18 @@ def split_klasse(klasse_ges) -> (int, str):
 
 def split_text(text):
     if '?' in text:
-        # Text am Fragezeichen trennen
         teile_text = text.split('?')
-
-        # Entferne das Fragezeichen und definiere die Variablen
         teil_1, teil_2 = [teil.strip() for teil in teile_text if teil]
-
-        # Ausgabe der Variablen
-        # print("Frage 1:", teil_1)
-        # print("Frage 2:", teil_2)
         ausgabe = (teil_1, teil_2)
-
     else:
-        # Falls kein Fragezeichen vorhanden ist, den Originaltext zurückgeben
-        # print("Kein Fragezeichen im Text. Originaltext:", raum)
         ausgabe = (text, "")
     return ausgabe
 
 
 def scrape():
-    # Jede Unterseite und jedes Unterverzeichnis durchgehen
     for index in range(len(SUBDIRS)):
         i = 1
-        update_datum_str = None  # wird später aus "Stand:" gezogen
+        update_datum_str = None
         expected_date = datetime.now() + timedelta(days=index)
 
         while True:
@@ -65,70 +54,94 @@ def scrape():
             url = f"{BASE}/{SUBDIRS[index]}/{filename}"
 
             r = requests.get(url)
-           if r.status_code != 200:
-               break
+            if r.status_code != 200:
+                break
 
-           r.encoding = 'utf-8'
-           soup = BeautifulSoup(r.text, 'html.parser')
-           page_text = soup.get_text()
+            r.encoding = 'utf-8'
+            soup = BeautifulSoup(r.text, 'html.parser')
+            page_text = soup.get_text()
 
-           # Stand-Datum extrahieren
-           if update_datum_str is None:
-               stand_match = re.search(
-                   r"Stand:\s*(\d{1,2}\.\d{1,2}\.\d{4})", page_text)
-               if stand_match:
-                   update_datum_str = stand_match.group(1)
+            # Stand-Datum extrahieren
+            if update_datum_str is None:
+                stand_match = re.search(
+                    r"Stand:\s*(\d{1,2}\.\d{1,2}\.\d{4})", page_text)
+                if stand_match:
+                    update_datum_str = stand_match.group(1)
 
-           # Seitendatum extrahieren
-           datum_match = re.search(
-               r"(\d{1,2}\.\d{1,2})(?:\.(\d{4}))?", page_text)
-           if not datum_match:
-               break
+            # Seitendatum extrahieren
+            datum_match = re.search(
+                r"(\d{1,2}\.\d{1,2})(?:\.(\d{4}))?", page_text)
+            if not datum_match:
+                break
 
-           tag_monat = datum_match.group(1)
-           jahr = datum_match.group(2) if datum_match.group(
-               2) else str(expected_date.year)
-           seitendatum = f"{tag_monat}.{jahr}"
+            tag_monat = datum_match.group(1)
+            jahr = datum_match.group(2) if datum_match.group(
+                2) else str(expected_date.year)
+            seitendatum = f"{tag_monat}.{jahr}"
 
-           table = soup.find("table")
-           if not table:
-               break
-           # Entscheidung: heute oder morgen
-           if seitendatum == update_datum_str:
+            tables = soup.find_all("table")
+            table = None
+            for t in tables:
+                headers = [th.get_text(strip=True).lower()
+                           for th in t.find_all("th")]
+                if headers and ("klasse" in headers and "stunde" in headers and "fach" in headers):
+                    table = t
+                    break
 
-               rows = table.find_all("tr")
-               for row in rows[1:]:
-                   cells = row.find_all("td")
-                   if len(cells) < 5:
-                       continue
+            if not table:
+                break  # keine passende Tabelle gefunden
 
-                   stunde = cells[1].text.strip()
-                   klasse_ges = cells[0].text.strip()
-                   fach_ges = cells[2].text.strip()
-                   raum_ges = cells[3].text.strip()
-                   text = cells[4].text.strip()
-                   lehrer_ges = ""  # cells[].text.strip()
+            if seitendatum == update_datum_str:
+                rows = table.find_all("tr")
+                for row in rows[1:]:
+                    cells = row.find_all("td")
+                    if len(cells) < 5:
+                        continue
 
-                   (stufe, klasse) = split_klasse(klasse_ges)
-                   (fach, fach_neu) = split_text(fach_ges)
-                   (raum, raum_neu) = split_text(raum_ges)
-                   (lehrer, lehrer_neu) = split_text(lehrer_ges)
+                    stunde = cells[1].text.strip()
+                    klasse_ges = cells[0].text.strip()
+                    fach_ges = cells[2].text.strip()
+                    raum_ges = cells[3].text.strip()
+                    text = cells[4].text.strip()
+                    lehrer_ges = ""
 
-                   vert = {
-                       "klasse": klasse,
-                       "stufe": stufe,
-                       "stunde": stunde,
-                       "fach": fach,
-                       "fach_neu": fach_neu,
-                       "text": text,
-                       "raum": raum,
-                       "raum_neu": raum_neu,
-                       "lehrer": lehrer,
-                       "lehrer_neu": lehrer_neu,
-                   }
-                   vertretungen[index][klasse].append(vert)
+                    (fach, fach_neu) = split_text(fach_ges)
+                    (raum, raum_neu) = split_text(raum_ges)
+                    (stufe, klasse) = split_klasse(klasse_ges)
+                    (lehrer, lehrer_neu) = split_text(lehrer_ges)
 
-               i += 1  # nächste Seite
+                    vert = {
+                        "klasse": klasse,
+                        "stufe": stufe,
+                        "stunde": stunde,
+                        "fach": fach,
+                        "fach_neu": fach_neu,
+                        "text": text,
+                        "raum": raum,
+                        "raum_neu": raum_neu,
+                        "lehrer": lehrer,
+                        "lehrer_neu": lehrer_neu,
+                    }
+                    vertretungen[index][klasse].append(vert)
+
+            i += 1
+
+    # Ergebnisse ausgeben
+    for i in range(2):
+        number = 0
+        if i == 0:
+            print("Heute")
+        else:
+            print("Morgen")
+        for klasse in sorted(vertretungen[i]):
+            print(f"\n=== {klasse} ===")
+            for v in vertretungen[i][klasse]:
+                number += 1
+                print(f"\tStunde {v['stunde']}: {
+                      v['fach']} — {v['raum']} / {v['text']}")
+        print(str(i+1) + " :" + str(number))
+        print("")
+
     return vertretungen
 
 

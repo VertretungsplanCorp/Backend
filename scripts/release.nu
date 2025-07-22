@@ -1,4 +1,3 @@
 print "releasing..."
-direnv dotenv json .env | from json | load-env
-let version = $"v($env.VERSION)"
-gh release create $"($version)" --title $version --generate-notes --prerelease=false ./out/* 
+let version = (nu ($env.CURRENT_FILE | path dirname)/read-version.nu)
+gh release create $version --title $version --generate-notes --prerelease=false ./out/* 

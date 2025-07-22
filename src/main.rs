@@ -41,21 +41,23 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("database/migration
 // % SCRAPER %
 async fn scraper() -> PyResult<()> {
     loop {
-        let now = Local::now();
-        let target_time = now
-            .date_naive()
-            .and_hms_opt(7, 3, 0)
-            .unwrap()
-            .and_local_timezone(now.timezone())
-            .unwrap();
+        // let now = Local::now();
+        // let target_time = now
+        //     .date_naive()
+        //     .and_hms_opt(7, 3, 0)
+        //     .unwrap()
+        //     .and_local_timezone(now.timezone())
+        //     .unwrap();
+        //
+        // let duration_until = if target_time < now {
+        //     (target_time + chrono::Duration::days(1)) - now
+        // } else {
+        //     target_time - now
+        // };
+        //
+        // sleep(Duration::from_secs(duration_until.num_seconds() as u64)).await;
 
-        let duration_until = if target_time < now {
-            (target_time + chrono::Duration::days(1)) - now
-        } else {
-            target_time - now
-        };
-
-        sleep(Duration::from_secs(duration_until.num_seconds() as u64)).await;
+        sleep(Duration::from_secs(30)).await;
 
         Python::with_gil(|py| {
             py.run(
@@ -97,6 +99,8 @@ async fn api() {
         .route("/ping", get(ping))
         .route("/ping_json", get(ping_json))
         .route("/get_klasse", get(get_klasse))
+        .route("/get_stufe", get(get_stufe))
+        .route("/get_info", get(get_info))
         .layer(cors)
         .with_state(pool);
 

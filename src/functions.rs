@@ -4,31 +4,42 @@ use crate::database::*;
 
 // % extern %
 use axum::{
+    body::Body,
     extract::{Query, State},
-    response::{IntoResponse, Json},
+    http,
+    response::{Json, Response},
 };
 use chrono::{DateTime, Utc};
 use deadpool_diesel::postgres::Pool;
-use diesel::{prelude::*, result::DatabaseErrorInformation};
+use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
 // %% HELPER FUNCTIONS %%
 
-pub async fn query_db<F, R>(pool: Pool, f: F) -> Result<R, impl IntoResponse>
+type BackendError = Response;
+type BackendResponse = Result<Json<Value>, BackendError>;
+
+pub async fn query_db<F, R>(pool: Pool, f: F) -> Result<R, BackendError>
 where
-    F: FnOnce(&mut PgConnection) -> R + Send + 'static,
+    F: FnOnce(&mut PgConnection) -> Result<R, diesel::result::Error> + Send + 'static,
     R: Send + 'static,
 {
     let m = pool
         .get()
         .await
-        .map_err(|_| "cannot access database".to_string())?;
-    m.interact(f)
+        .map_err(|_| http::Response::new(Body::from(String::from("cannot access database"))))?;
+
+    let r = m
+        .interact(f)
         .await
-        .map_err(|_| "cannot interact with database".to_string())
-        .map_err(|e| format!("Couldn't query. Error: {}", e.message()))
+        .map_err(|_| http::Response::new(Body::from(String::from("cannot query database"))))?
+        .map_err(|_| {
+            http::Response::new(Body::from(String::from("cannot interact with database")))
+        })?;
+
+    Ok(r)
 }
 
 // %% FUNCTIONS %%
@@ -114,7 +125,7 @@ pub struct KlasseQuery {
 pub async fn get_klasse(
     Query(KlasseQuery { klasse, stufe }): Query<KlasseQuery>,
     State(pool): State<Pool>,
-) -> Result<Json<Value>, impl IntoResponse> {
+) -> BackendResponse {
     use schema::vertretungen::dsl as s;
 
     let vertretungen: Vec<models::Vertretung> = query_db(pool, move |c| {
@@ -123,7 +134,7 @@ pub async fn get_klasse(
             .filter(s::klasse.eq(klasse.to_string()))
             .load(c)
     })
-    .await??;
+    .await?;
 
     let r: vp_api::Klasse = Klasse {
         klasse,
@@ -152,7 +163,7 @@ impl From<Stufe> for vp_api::Stufe {
             if let Some(v) = m.get_mut(&k) {
                 v.push(e);
             } else {
-                m.insert(k, vec![e.into()]);
+                m.insert(k, vec![e]);
             }
         }
 
@@ -176,16 +187,16 @@ impl From<Stufe> for vp_api::Stufe {
 pub struct StufeQuery {
     stufe: u8,
 }
-async fn get_stufe(
+pub async fn get_stufe(
     Query(StufeQuery { stufe }): Query<StufeQuery>,
     State(pool): State<Pool>,
-) -> Result<Json<Value>, impl IntoResponse> {
+) -> BackendResponse {
     use schema::vertretungen::dsl as s;
 
     let vertretungen: Vec<models::Vertretung> = query_db(pool, move |c| {
         s::vertretungen.filter(s::stufe.eq(stufe as i16)).load(c)
     })
-    .await??;
+    .await?;
 
     let r: vp_api::Stufe = Stufe {
         stufe,
@@ -196,9 +207,9 @@ async fn get_stufe(
     Ok(Json(serde_json::to_value(r).unwrap()))
 }
 
-pub async fn get_info(State(pool): State<Pool>) -> Result<Json<Value>, impl IntoResponse> {
+pub async fn get_info(State(pool): State<Pool>) -> BackendResponse {
     use schema::infos::dsl::*;
-    let r: models::Infos = query_db(pool, move |c| infos.first(c)).await??;
+    let r: models::Infos = query_db(pool, move |c| infos.first(c)).await?;
 
     Ok(Json(
         serde_json::to_value(vp_api::Info {

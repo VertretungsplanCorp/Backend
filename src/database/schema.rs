@@ -37,6 +37,8 @@ diesel::table! {
         raum -> Nullable<Varchar>,
         #[max_length = 3]
         raum_neu -> Nullable<Varchar>,
+        lehrer -> Nullable<Varchar>,
+        lehrer_neu -> Nullable<Varchar>,
         #[max_length = 100]
         text -> Nullable<Varchar>,
         datum -> Timestamptz,
@@ -44,8 +46,4 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(
-    infos,
-    spatial_ref_sys,
-    vertretungen,
-);
+diesel::allow_tables_to_appear_in_same_query!(infos, spatial_ref_sys, vertretungen,);
