@@ -1,0 +1,3 @@
+bs4>=4.13.4
+2psycopg>=2.9.10
+python-dotenv>=1.1.1

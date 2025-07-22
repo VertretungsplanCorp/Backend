@@ -16,5 +16,8 @@ RUN apt update && apt install nushell
 COPY .env .
 COPY server.nu .
 COPY vp-backend .
+COPY requirements.txt .
+
+RUN pip install -r requirements.txt
 
 CMD ["nu", "server.nu"]
