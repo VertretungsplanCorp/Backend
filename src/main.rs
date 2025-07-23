@@ -7,7 +7,7 @@ use deadpool_diesel::{
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyDict};
 use std::ffi::CString;
 use std::{
     env,
@@ -57,7 +57,7 @@ async fn scraper() -> PyResult<()> {
         //
         // sleep(Duration::from_secs(duration_until.num_seconds() as u64)).await;
 
-        sleep(Duration::from_secs(30)).await;
+        // println!("{}", std::env::var("PYTHONPATH").unwrap());
 
         Python::with_gil(|py| {
             py.run(
@@ -67,6 +67,8 @@ async fn scraper() -> PyResult<()> {
             )
             .unwrap();
         });
+
+        sleep(Duration::from_secs(30)).await;
     }
 }
 

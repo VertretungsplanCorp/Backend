@@ -1,36 +1,53 @@
+import re
+import os
+from datetime import datetime, timedelta
+from dataclasses import dataclass
+
 import requests
 from bs4 import BeautifulSoup
-from collections import defaultdict
-import re
-from datetime import datetime, timedelta
-import psycopg2  # für PostgreSQL
+import psycopg2
 from dotenv import load_dotenv
-import os
 
 
-# Verbindung zur PostgreSQL-Datenbank herstellen
-# Lade die .env-Datei
-load_dotenv()
+@dataclass
+class Vertretung:
+    stufe: int
+    klasse: str
+    stunde: int
+    fach: str
+    fach_neu: str
+    lehrer: str
+    lehrer_neu: str
+    text: str
+    raum: str
+    raum_neu: str
 
-SUBDIRS = ["f1", "f2"]
-BASE = os.getenv('SCRAPING_BASE')
 
-print("running on base: ", BASE)
-
-vertretungenheute = defaultdict(list)
-vertretungenmorgen = defaultdict(list)
-
-vertretungen = [vertretungenheute, vertretungenmorgen]
-
-
-def split_klasse(klasse_ges) -> (int, str):
+def split_klasse(klasse_ges: str) -> (int, str):
     stufe = 0
     klasse = ""
     match = re.search(r'(\d+)(.*)', klasse_ges)
     if match:
-        stufe = match.group(0)
-        klasse = match.group(1)
+        stufe = match.group(1)
+        klasse = match.group(2)
     return (stufe, klasse)
+
+
+def split_stunden(stunden_ges: str) -> range:
+    stunden = range(0)
+    match = re.search(r'(\d+) ?-? ?(\d+)?', stunden_ges)
+    if match:
+        von_match = match.group(1)
+        bis_match = match.group(2)
+
+        von = int(von_match)
+        if not bis_match:
+            stunden = range(von, von + 1)
+        else:
+            bis = int(bis_match)
+            stunden = range(von, bis + 1)
+
+    return stunden
 
 
 def split_text(text):
@@ -43,21 +60,24 @@ def split_text(text):
     return ausgabe
 
 
-def scrape():
-    for index in range(len(SUBDIRS)):
+def scrape(base, subdirs):
+    vertretungen = {}
+    for index, subdir in enumerate(subdirs):
         i = 1
         update_datum_str = None
         expected_date = datetime.now() + timedelta(days=index)
 
+        if expected_date not in vertretungen:
+            vertretungen[expected_date] = []
+
         while True:
             filename = f"subst_{i:03}.htm"
-            url = f"{BASE}/{SUBDIRS[index]}/{filename}"
+            url = f"{base}/{subdir}/{filename}"
 
             r = requests.get(url)
             if r.status_code != 200:
                 break
 
-            r.encoding = 'utf-8'
             soup = BeautifulSoup(r.text, 'html.parser')
             page_text = soup.get_text()
 
@@ -98,7 +118,7 @@ def scrape():
                     if len(cells) < 5:
                         continue
 
-                    stunde = cells[1].text.strip()
+                    stunden_ges = cells[1].text.strip()
                     klasse_ges = cells[0].text.strip()
                     fach_ges = cells[2].text.strip()
                     raum_ges = cells[3].text.strip()
@@ -109,97 +129,78 @@ def scrape():
                     (raum, raum_neu) = split_text(raum_ges)
                     (stufe, klasse) = split_klasse(klasse_ges)
                     (lehrer, lehrer_neu) = split_text(lehrer_ges)
+                    stunden = split_stunden(stunden_ges)
 
-                    vert = {
-                        "klasse": klasse,
-                        "stufe": stufe,
-                        "stunde": stunde,
-                        "fach": fach,
-                        "fach_neu": fach_neu,
-                        "text": text,
-                        "raum": raum,
-                        "raum_neu": raum_neu,
-                        "lehrer": lehrer,
-                        "lehrer_neu": lehrer_neu,
-                    }
-                    vertretungen[index][klasse].append(vert)
-
+                    for stunde in stunden:
+                        vert = Vertretung(stufe, klasse, stunde, fach, fach_neu,
+                                          lehrer, lehrer_neu, text, raum,
+                                          raum_neu)
+                        vertretungen[expected_date].append(vert)
             i += 1
-
-    # Ergebnisse ausgeben
-    for i in range(2):
-        number = 0
-        if i == 0:
-            print("Heute")
-        else:
-            print("Morgen")
-        for klasse in sorted(vertretungen[i]):
-            print(f"\n=== {klasse} ===")
-            for v in vertretungen[i][klasse]:
-                number += 1
-                print(f"\tStunde {v['stunde']}: {
-                      v['fach']} — {v['raum']} / {v['text']}")
-        print(str(i+1) + " :" + str(number))
-        print("")
-
     return vertretungen
 
 
-print("connecting...")
-# Verbindung zur PostgreSQL-Datenbank herstellen, mit den Werten aus der .env-Datei
-conn = psycopg2.connect(
-    host=os.getenv('DB_HOST'),  # liest den Wert von DB_HOST aus der .env-Datei
-    # liest den Wert von DB_USER aus der .env-Datei
-    user=os.getenv('DB_USERNAME'),
-    # liest den Wert von DB_PASSWORT aus der .env-Datei
-    password=os.getenv('DB_PASSWORD'),
-    # liest den Wert von DB_NAME aus der .env-Datei
-    database=os.getenv('DB_NAME')
-)
-# conn = psycopg2.connect(
-#   host='DEIN_DB_HOST',
-#  user='DEIN_DB_USER',
-#    password='DEIN_DB_PASSWORT',
-#    database='DEINE_DATENBANK'
-# )
-
-cursor = conn.cursor()
-
-
-def speichere_in_db(vertretungen, datum):
-    for klasse in vertretungen:
-        for v in vertretungen[klasse]:
+def speichere_in_db(connection, vertretungen):
+    cursor = connection.cursor()
+    cursor.execute('''DELETE FROM vertretungen''')
+    for datum, datum_vtr in vertretungen.items():
+        for v in datum_vtr:
+            if v.stufe == 0:
+                continue
+            if v.klasse == '':
+                continue
+            if v.stunde == 0:
+                continue
+            if v.fach == '':
+                continue
+            if v.raum == '---':
+                v.raum = None
             cursor.execute('''
-                           INSERT INTO vertretungen (datum, stufe, klasse, stunde,
-                           fach, fach_neu, raum, raum_neu, lehrer, lehrer_neu, text)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', (
-                datum,
-                v["stufe"],
-                v["klasse"],
-                v["stunde"],
-                v["fach"],
-                v["fach_neu"],
-                v["raum"],
-                v["raum_neu"],
-                v["lehrer"],
-                v["lehrer_neu"],
-                v["text"],
-            ))
-    conn.commit()
+                               INSERT INTO vertretungen (datum, stufe, klasse, stunde,
+                               fach, fach_neu, raum, raum_neu, lehrer, lehrer_neu, text)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                           (
+                               datum,
+                               v.stufe,
+                               v.klasse,
+                               v.stunde,
+                               v.fach,
+                               v.fach_neu or None,
+                               v.raum or None,
+                               v.raum_neu or None,
+                               v.lehrer or None,
+                               v.lehrer_neu or None,
+                               v.text or None,
+                           ))
+    cursor.close()
+    connection.commit()
 
 
-# --- Hauptteil ---
-print("scraping...")
-vertretungenheute, vertretungenmorgen = scrape()
+def main():
+    load_dotenv()
 
-heute = datetime.today().date()
-morgen = heute + timedelta(days=1)
+    SUBDIRS = ["f1", "f2"]
+    BASE = os.getenv('SCRAPING_BASE')
 
-print("saving in db...")
-speichere_in_db(vertretungenheute, heute)
-speichere_in_db(vertretungenmorgen, morgen)
+    print("running on base: ", BASE)
 
-print("finishing...")
-cursor.close()
-conn.close()
-# print("Einträge aktualisiert.")
+    print("scraping...")
+    vertretungen = scrape(BASE, SUBDIRS)
+
+    print("connecting...")
+    connection = psycopg2.connect(
+        host=os.getenv('DB_HOST'),
+        user=os.getenv('DB_USERNAME'),
+        password=os.getenv('DB_PASSWORD'),
+        database=os.getenv('DB_NAME')
+    )
+
+    print("saving in db...")
+    speichere_in_db(connection, vertretungen)
+
+    print("finishing...")
+    connection.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -8,17 +8,14 @@ RUN apt-get update && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt install -y python3.13-full python3.13-dev python3.13-venv
 
-RUN curl -fsSL https://apt.fury.io/nushell/gpg.key | gpg --dearmor -o /etc/apt/trusted.gpg.d/fury-nushell.gpg
-RUN echo "deb https://apt.fury.io/nushell/ /" | tee /etc/apt/sources.list.d/fury.list
-RUN apt update && apt install nushell
-
 COPY .env .
 COPY server.nu .
 COPY vp-backend .
 COPY requirements.txt .
 
-RUN python3.13 -m venv vp-env
-ENV PATH="vp-env/bin:$PATH"
+ENV LANG en_US.UTF-8
+RUN python3.13 -m venv /opt/vp-env
+ENV PATH="/opt/vp-env/bin:$PATH"
 RUN pip install -r requirements.txt
 
-CMD ["nu", "server.nu"]
+CMD ["./vp-backend"]
