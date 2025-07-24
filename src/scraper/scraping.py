@@ -56,7 +56,7 @@ def split_text(text):
         teil_1, teil_2 = [teil.strip() for teil in teile_text if teil]
         ausgabe = (teil_1, teil_2)
     else:
-        ausgabe = (text, "")
+        ausgabe = ("", text)
     return ausgabe
 
 
@@ -151,10 +151,8 @@ def speichere_in_db(connection, vertretungen):
                 continue
             if v.stunde == 0:
                 continue
-            if v.fach == '':
-                continue
-            if v.raum == '---':
-                v.raum = None
+            if v.raum_neu == '---':
+                v.raum_neu = None
             cursor.execute('''
                                INSERT INTO vertretungen (datum, stufe, klasse, stunde,
                                fach, fach_neu, raum, raum_neu, lehrer, lehrer_neu, text)
@@ -164,7 +162,7 @@ def speichere_in_db(connection, vertretungen):
                                v.stufe,
                                v.klasse,
                                v.stunde,
-                               v.fach,
+                               v.fach or None,
                                v.fach_neu or None,
                                v.raum or None,
                                v.raum_neu or None,

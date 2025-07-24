@@ -30,7 +30,7 @@ diesel::table! {
         stufe -> Int2,
         stunde -> Int2,
         #[max_length = 20]
-        fach -> Varchar,
+        fach -> Nullable<Varchar>,
         #[max_length = 20]
         fach_neu -> Nullable<Varchar>,
         #[max_length = 3]

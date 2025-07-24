@@ -11,7 +11,7 @@ pub struct Vertretung {
     pub klasse: String,
     pub stufe: i16,
     pub stunde: i16,
-    pub fach: String,
+    pub fach: Option<String>,
     pub fach_neu: Option<String>,
     pub raum: Option<String>,
     pub raum_neu: Option<String>,

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS vertretungen (
     klasse VARCHAR(5) NOT NULL,
     stufe SMALLINT CHECK (stufe >= 5 AND stufe <= 13) NOT NULL,
     stunde SMALLINT CHECK (stunde > 0 AND stunde < 10) NOT NULL,
-    fach VARCHAR(10) NOT NULL,
+    fach VARCHAR(10),
     fach_neu VARCHAR(10),
     raum VARCHAR(10),
     raum_neu VARCHAR(10),
