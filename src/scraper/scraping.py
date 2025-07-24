@@ -23,19 +23,19 @@ class Vertretung:
     raum_neu: str
 
 
-def split_klasse(klasse_ges: str) -> (int, str):
+def split_klasse(klasse_ges) -> (int, str):
     stufe = 0
-    klasse = ""
-    match = re.search(r'(\d+)(.*)', klasse_ges)
+    klassen = []
+    match = re.search(r'(\d+)(.*)', klasse_ges.text.strip())
     if match:
         stufe = match.group(1)
-        klasse = match.group(2)
-    return (stufe, klasse)
+        klassen = list(match.group(2))
+    return (stufe, klassen)
 
 
-def split_stunden(stunden_ges: str) -> range:
+def split_stunden(stunden_ges) -> range:
     stunden = range(0)
-    match = re.search(r'(\d+) ?-? ?(\d+)?', stunden_ges)
+    match = re.search(r'(\d+) ?-? ?(\d+)?', stunden_ges.text.strip())
     if match:
         von_match = match.group(1)
         bis_match = match.group(2)
@@ -50,14 +50,18 @@ def split_stunden(stunden_ges: str) -> range:
     return stunden
 
 
-def split_text(text):
-    if '?' in text:
-        teile_text = text.split('?')
-        teil_1, teil_2 = [teil.strip() for teil in teile_text if teil]
-        ausgabe = (teil_1, teil_2)
-    else:
-        ausgabe = ("", text)
-    return ausgabe
+def split_text(text_ges):
+    text = ""
+    text_neu = ""
+    match = re.search(r'^(\w+)\??(\w*?)$', text_ges.text.strip())
+    if match:
+        if text_ges.s:  # durchgestrichen
+            text = match.group(1)
+            text_neu = match.group(2)
+        else:
+            text = match.group(2)
+            text_neu = match.group(1)
+    return (text, text_neu)
 
 
 def scrape(base, subdirs):
@@ -118,24 +122,19 @@ def scrape(base, subdirs):
                     if len(cells) < 5:
                         continue
 
-                    stunden_ges = cells[1].text.strip()
-                    klasse_ges = cells[0].text.strip()
-                    fach_ges = cells[2].text.strip()
-                    raum_ges = cells[3].text.strip()
+                    (stufe, klassen) = split_klasse(cells[0])
+                    stunden = split_stunden(cells[1])
+                    (fach, fach_neu) = split_text(cells[2])
+                    (raum, raum_neu) = split_text(cells[3])
+                    (lehrer, lehrer_neu) = ("", "")  # todo: add cell
                     text = cells[4].text.strip()
-                    lehrer_ges = ""
-
-                    (fach, fach_neu) = split_text(fach_ges)
-                    (raum, raum_neu) = split_text(raum_ges)
-                    (stufe, klasse) = split_klasse(klasse_ges)
-                    (lehrer, lehrer_neu) = split_text(lehrer_ges)
-                    stunden = split_stunden(stunden_ges)
 
                     for stunde in stunden:
-                        vert = Vertretung(stufe, klasse, stunde, fach, fach_neu,
-                                          lehrer, lehrer_neu, text, raum,
-                                          raum_neu)
-                        vertretungen[expected_date].append(vert)
+                        for klasse in klassen:
+                            vert = Vertretung(stufe, klasse, stunde, fach, fach_neu,
+                                              lehrer, lehrer_neu, text, raum,
+                                              raum_neu)
+                            vertretungen[expected_date].append(vert)
             i += 1
     return vertretungen
 

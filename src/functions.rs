@@ -12,6 +12,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use deadpool_diesel::postgres::Pool;
 use diesel::prelude::*;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -91,12 +92,12 @@ impl From<Klasse> for vp_api::Klasse {
             vertretungen,
         }: Klasse,
     ) -> Self {
-        let mut m: HashMap<DateTime<Utc>, Vec<vp_api::Vertretung>> = HashMap::new();
+        let mut m: IndexMap<DateTime<Utc>, Vec<vp_api::Vertretung>> = IndexMap::new();
         for e in vertretungen {
             if let Some(d) = m.get_mut(&e.datum) {
                 d.push(e.into());
             } else {
-                m.insert(e.datum, vec![e.into()]);
+                m.insert_sorted(e.datum, vec![e.into()]);
             }
         }
 

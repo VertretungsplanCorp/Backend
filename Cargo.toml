@@ -21,4 +21,5 @@ pyo3 = { version = "0.25", features = ["auto-initialize"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0" }
 uuid = { version = "1.17", features = ["serde"] }
+indexmap = { version = "2.10" }
 vp-api = { version = "0.0.1", git = "https://github.com/VertretungsplanCorp/Api.git", features = ["db"]}
