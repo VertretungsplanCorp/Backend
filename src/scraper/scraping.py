@@ -26,10 +26,19 @@ class Vertretung:
 def split_klasse(klasse_ges) -> (int, str):
     stufe = 0
     klassen = []
-    match = re.search(r'(\d+)(.*)', klasse_ges.text.strip())
+    match = re.search(r'(\d+)(?:(\w\d?) ?- ?(\w\d?)|(\w+\d?))?',
+                      klasse_ges.text.strip())
     if match:
         stufe = match.group(1)
-        klassen = list(match.group(2))
+        klasse_von = match.group(2)
+        klasse_bis = match.group(3)
+        klassen_ges = match.group(4)
+
+        if klassen_ges:
+            klassen = list(klassen_ges)
+        else:
+            klassen = [chr(i) for i in range(ord(klasse_von[0]),
+                                             ord(klasse_bis[0])+1)]
     return (stufe, klassen)
 
 
@@ -46,7 +55,6 @@ def split_stunden(stunden_ges) -> range:
         else:
             bis = int(bis_match)
             stunden = range(von, bis + 1)
-
     return stunden
 
 
@@ -66,16 +74,9 @@ def split_text(text_ges):
 
 def scrape(base, subdirs):
     vertretungen = {}
-    for index, subdir in enumerate(subdirs):
-        i = 1
-        update_datum_str = None
-        expected_date = datetime.now() + timedelta(days=index)
-
-        if expected_date not in vertretungen:
-            vertretungen[expected_date] = []
-
-        while True:
-            filename = f"subst_{i:03}.htm"
+    for subdir in subdirs:
+        for i in range(1, 4):
+            filename = f"subst_00{i}.htm"
             url = f"{base}/{subdir}/{filename}"
 
             r = requests.get(url)
@@ -83,25 +84,26 @@ def scrape(base, subdirs):
                 break
 
             soup = BeautifulSoup(r.text, 'html.parser')
-            page_text = soup.get_text()
 
-            # Stand-Datum extrahieren
-            if update_datum_str is None:
-                stand_match = re.search(
-                    r"Stand:\s*(\d{1,2}\.\d{1,2}\.\d{4})", page_text)
-                if stand_match:
-                    update_datum_str = stand_match.group(1)
+            mon_title = soup.find_all("div", class_="mon_title")
 
-            # Seitendatum extrahieren
-            datum_match = re.search(
-                r"(\d{1,2}\.\d{1,2})(?:\.(\d{4}))?", page_text)
-            if not datum_match:
-                break
+            if not mon_title:
+                continue
 
-            tag_monat = datum_match.group(1)
-            jahr = datum_match.group(2) if datum_match.group(
-                2) else str(expected_date.year)
-            seitendatum = f"{tag_monat}.{jahr}"
+            datum_split = mon_title[0].text.split()
+
+            if not datum_split:
+                continue
+
+            datum_str = datum_split[0]
+
+            datum = datetime.strptime(datum_str, "%d.%m.%Y")
+
+            if not datum:
+                continue
+
+            if datum not in vertretungen:
+                vertretungen[datum] = []
 
             tables = soup.find_all("table")
             table = None
@@ -113,29 +115,27 @@ def scrape(base, subdirs):
                     break
 
             if not table:
-                break  # keine passende Tabelle gefunden
+                break
 
-            if seitendatum == update_datum_str:
-                rows = table.find_all("tr")
-                for row in rows[1:]:
-                    cells = row.find_all("td")
-                    if len(cells) < 5:
-                        continue
+            rows = table.find_all("tr")
+            for row in rows[1:]:
+                cells = row.find_all("td")
+                if len(cells) < 5:
+                    continue
 
-                    (stufe, klassen) = split_klasse(cells[0])
-                    stunden = split_stunden(cells[1])
-                    (fach, fach_neu) = split_text(cells[2])
-                    (raum, raum_neu) = split_text(cells[3])
-                    (lehrer, lehrer_neu) = ("", "")  # todo: add cell
-                    text = cells[4].text.strip()
+                (stufe, klassen) = split_klasse(cells[0])
+                stunden = split_stunden(cells[1])
+                (fach, fach_neu) = split_text(cells[2])
+                (raum, raum_neu) = split_text(cells[3])
+                (lehrer, lehrer_neu) = ("", "")  # todo: add cell
+                text = cells[4].text.strip()
 
-                    for stunde in stunden:
-                        for klasse in klassen:
-                            vert = Vertretung(stufe, klasse, stunde, fach, fach_neu,
-                                              lehrer, lehrer_neu, text, raum,
-                                              raum_neu)
-                            vertretungen[expected_date].append(vert)
-            i += 1
+                for stunde in stunden:
+                    for klasse in klassen:
+                        vert = Vertretung(stufe, klasse, stunde, fach, fach_neu,
+                                          lehrer, lehrer_neu, text, raum,
+                                          raum_neu)
+                        vertretungen[datum].append(vert)
     return vertretungen
 
 
