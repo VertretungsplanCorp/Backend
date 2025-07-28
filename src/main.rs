@@ -100,7 +100,7 @@ async fn api() {
         .route("/ping_json", get(ping_json))
         .route("/get_klasse", get(get_klasse))
         .route("/get_stufe", get(get_stufe))
-        .route("/get_stufe", get(get_stufe))
+        .route("/get_stufen", get(get_stufen))
         .route("/get_unterstufe", get(get_unterstufe))
         .route("/get_mittelstufe", get(get_mittelstufe))
         .route("/get_oberstufe", get(get_oberstufe))
