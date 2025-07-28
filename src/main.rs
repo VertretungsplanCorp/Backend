@@ -1,13 +1,12 @@
 // %% INCLUDES %%
 use axum::{routing::get, Router};
-use chrono::Local;
 use deadpool_diesel::{
     postgres::{Manager, Pool},
     Runtime::Tokio1,
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
-use pyo3::{prelude::*, types::PyDict};
+use pyo3::prelude::*;
 use std::ffi::CString;
 use std::{
     env,
@@ -20,7 +19,6 @@ use tower_http::cors::*;
 
 // %% MODULE %%
 mod database;
-use database::schema::*;
 
 mod functions;
 use functions::*;
@@ -102,6 +100,10 @@ async fn api() {
         .route("/ping_json", get(ping_json))
         .route("/get_klasse", get(get_klasse))
         .route("/get_stufe", get(get_stufe))
+        .route("/get_stufe", get(get_stufe))
+        .route("/get_unterstufe", get(get_unterstufe))
+        .route("/get_mittelstufe", get(get_mittelstufe))
+        .route("/get_oberstufe", get(get_oberstufe))
         .route("/get_info", get(get_info))
         .layer(cors)
         .with_state(pool);

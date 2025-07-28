@@ -15,7 +15,6 @@ use diesel::prelude::*;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 
 // %% HELPER FUNCTIONS %%
 
@@ -80,7 +79,7 @@ impl From<models::Vertretung> for vp_api::Vertretung {
 }
 
 struct Klasse {
-    klasse: char,
+    klasse: String,
     stufe: u8,
     vertretungen: Vec<models::Vertretung>,
 }
@@ -120,7 +119,7 @@ impl From<Klasse> for vp_api::Klasse {
 
 #[derive(Serialize, Deserialize)]
 pub struct KlasseQuery {
-    klasse: char,
+    klasse: String,
     stufe: u8,
 }
 pub async fn get_klasse(
@@ -129,10 +128,11 @@ pub async fn get_klasse(
 ) -> BackendResponse {
     use schema::vertretungen::dsl as s;
 
+    let klasse_clone = klasse.clone();
     let vertretungen: Vec<models::Vertretung> = query_db(pool, move |c| {
         s::vertretungen
             .filter(s::stufe.eq(stufe as i16))
-            .filter(s::klasse.eq(klasse.to_string()))
+            .filter(s::klasse.eq(klasse_clone))
             .load(c)
     })
     .await?;
@@ -158,13 +158,13 @@ impl From<Stufe> for vp_api::Stufe {
             vertretungen,
         }: Stufe,
     ) -> Self {
-        let mut m: HashMap<char, Vec<models::Vertretung>> = HashMap::new();
+        let mut m: IndexMap<String, Vec<models::Vertretung>> = IndexMap::new();
         for e in vertretungen {
-            let k = e.klasse.clone().pop().unwrap();
+            let k = e.klasse.clone();
             if let Some(v) = m.get_mut(&k) {
                 v.push(e);
             } else {
-                m.insert(k, vec![e]);
+                m.insert_sorted(k, vec![e]);
             }
         }
 
@@ -206,6 +206,71 @@ pub async fn get_stufe(
     .into();
 
     Ok(Json(serde_json::to_value(r).unwrap()))
+}
+
+struct Stufen {
+    vertretungen: Vec<models::Vertretung>,
+}
+impl From<Stufen> for vp_api::Stufen {
+    fn from(Stufen { vertretungen }: Stufen) -> Self {
+        let mut m: IndexMap<u8, Vec<models::Vertretung>> = IndexMap::new();
+        for e in vertretungen {
+            let s = e.stufe as u8;
+            if let Some(v) = m.get_mut(&s) {
+                v.push(e);
+            } else {
+                m.insert_sorted(s, vec![e]);
+            }
+        }
+
+        let mut stufen: Vec<vp_api::Stufe> = Vec::new();
+        for (stufe, vertretungen) in m {
+            stufen.push(
+                Stufe {
+                    stufe,
+                    vertretungen,
+                }
+                .into(),
+            );
+        }
+
+        Self { stufen }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StufenQuery {
+    von: u8,
+    bis: u8,
+}
+pub async fn get_stufen(
+    Query(StufenQuery { von, bis }): Query<StufenQuery>,
+    State(pool): State<Pool>,
+) -> BackendResponse {
+    use schema::vertretungen::dsl as s;
+
+    let vertretungen: Vec<models::Vertretung> = query_db(pool, move |c| {
+        s::vertretungen
+            .filter(s::stufe.ge(von as i16).or(s::stufe.le(bis as i16)))
+            .load(c)
+    })
+    .await?;
+
+    let r: vp_api::Stufen = Stufen { vertretungen }.into();
+
+    Ok(Json(serde_json::to_value(r).unwrap()))
+}
+
+pub async fn get_unterstufe(state: State<Pool>) -> BackendResponse {
+    get_stufen(Query(StufenQuery { von: 5, bis: 8 }), state).await
+}
+
+pub async fn get_mittelstufe(state: State<Pool>) -> BackendResponse {
+    get_stufen(Query(StufenQuery { von: 9, bis: 11 }), state).await
+}
+
+pub async fn get_oberstufe(state: State<Pool>) -> BackendResponse {
+    get_stufen(Query(StufenQuery { von: 12, bis: 13 }), state).await
 }
 
 pub async fn get_info(State(pool): State<Pool>) -> BackendResponse {
