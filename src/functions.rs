@@ -15,7 +15,6 @@ use diesel::prelude::*;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tower_http::cors::{Any, CorsLayer}; // Import Any
 
 // %% HELPER FUNCTIONS %%
 

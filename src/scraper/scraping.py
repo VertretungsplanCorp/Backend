@@ -26,19 +26,26 @@ class Vertretung:
 def split_klasse(klasse_ges) -> (int, str):
     stufe = 0
     klassen = []
-    match = re.search(r'(\d+)(?:(\w\d?) ?- ?(\w\d?)|(\w+\d?))?',
+    match = re.search(r'(Q)?(\d+)(?:(\w\d?) ?- ?(\w\d?)|(\w+\d?))?',
                       klasse_ges.text.strip())
     if match:
-        stufe = match.group(1)
-        klasse_von = match.group(2)
-        klasse_bis = match.group(3)
-        klassen_ges = match.group(4)
+        ost = match.group(1)
+        stufe = match.group(2)
+        klasse_von = match.group(3)
+        klasse_bis = match.group(4)
+        klassen_ges = match.group(5)
 
-        if klassen_ges:
+        if ost:
+            klassen = list("Q")
+        elif klassen_ges:
             klassen = list(klassen_ges)
-        else:
+        elif klasse_von and klasse_bis:
             klassen = [chr(i) for i in range(ord(klasse_von[0]),
                                              ord(klasse_bis[0])+1)]
+        else:
+            print(
+                f"Warning: Failed to parse a class of stufe {stufe}!"
+            )
     return (stufe, klassen)
 
 
@@ -120,7 +127,9 @@ def scrape(base, subdirs):
             rows = table.find_all("tr")
             for row in rows[1:]:
                 cells = row.find_all("td")
-                if len(cells) < 5:
+
+                if (not cells):
+                    print("Warning: Cell is empty")
                     continue
 
                 (stufe, klassen) = split_klasse(cells[0])
