@@ -251,7 +251,7 @@ pub async fn get_stufen(
 
     let vertretungen: Vec<models::Vertretung> = query_db(pool, move |c| {
         s::vertretungen
-            .filter(s::stufe.ge(von as i16).or(s::stufe.le(bis as i16)))
+            .filter(s::stufe.ge(von as i16).and(s::stufe.le(bis as i16)))
             .load(c)
     })
     .await?;
