@@ -17,7 +17,8 @@ docker compose up -d
 ### nushell:
 
 ```nu
-mkdir vpbackend && cd vpbackend
+mkdir vpbackend
+cd vpbackend
 http get https://github.com/VertretungsplanCorp/Backend/releases/latest/download/vp-backend-bundle.tar.gz | save -f vp-backend-bundle.tar.gz
 tar -xzvf vp-backend-bundle.tar.gz
 rm vp-backend-bundle.tar.gz
